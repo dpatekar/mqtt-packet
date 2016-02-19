@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "bl": "^1.0.0",
-    "inherits": "^2.0.1"
+    "inherits": "^2.0.1",
+    "concat-stream": "^1.5.1"
   }
 }
