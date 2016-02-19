@@ -6,8 +6,9 @@ var protocol = require('./constants')
   , zeroBuf = new Buffer([0])
   , numCache = require('./numbers')
   , nextTick = process.nextTick
+  , concat = require('concat-stream')
 
-if (process.version.indexOf('v0.1') === 0) {
+/*if (process.version.indexOf('v0.1') === 0) {
   (function () {
     nextTick = function tickShim(func, stream) {
       process.nextTick(function tickWrap() {
@@ -15,41 +16,60 @@ if (process.version.indexOf('v0.1') === 0) {
       })
     }
   })()
-}
+}*/
 
 function generate(packet, stream) {
-  if (stream.cork) {
+  var writeConcatStream = concat({encoding: "buffer"}, function(data) {    
+    if (data) {
+      stream.write(data);
+    }
+  });
+  
+  writeConcatStream.on('error', function(err){    
+    stream.emit('error', err);
+  });
+  
+  /*if (stream.cork) {
     stream.cork()
     nextTick(uncork, stream)
-  }
-
+  }*/
+  var res = false;
   switch (packet.cmd) {
     case 'connect':
-      return connect(packet, stream);
+      res = connect(packet, writeConcatStream);
+      break;
     case 'connack':
-      return connack(packet, stream);
+      res = connack(packet, writeConcatStream);
+      break;
     case 'publish':
-      return publish(packet, stream);
+      res = publish(packet, writeConcatStream);
+      break;
     case 'puback':
     case 'pubrec':
     case 'pubrel':
     case 'pubcomp':
     case 'unsuback':
-      return confirmation(packet, stream);
+      res = confirmation(packet, writeConcatStream);
+      break;
     case 'subscribe':
-      return subscribe(packet, stream);
+      res = subscribe(packet, writeConcatStream);
+      break;
     case 'suback':
-      return suback(packet, stream);
+      res = suback(packet, writeConcatStream);
+      break;
     case 'unsubscribe':
-      return unsubscribe(packet, stream);
+      res = unsubscribe(packet, writeConcatStream);
+      break;
     case 'pingreq':
     case 'pingresp':
     case 'disconnect':
-      return emptyPacket(packet, stream);
+      res = emptyPacket(packet, writeConcatStream);
+      break;
     default:
       stream.emit('error', new Error('unknown command'));
-      return false;
-  }
+  }  
+  writeConcatStream.end();
+  return res;
 }
 
 function uncork(stream) {
